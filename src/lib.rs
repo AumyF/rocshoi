@@ -1,4 +1,5 @@
 use std::iter::Peekable;
+use std::str::Chars;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
@@ -11,74 +12,66 @@ pub enum Token {
     EOF,
 }
 
-fn take_while(
-    mut store: String,
-    tokens: &mut Vec<Token>,
-    chars: &mut Peekable<impl Iterator<Item = char>>,
-    predicate: impl Fn(char) -> bool,
-    make_token: impl FnOnce(String) -> Token,
-) {
-    loop {
-        match chars.peek() {
-            Some(&next) if predicate(next) => {
-                store.push(next);
-                chars.next();
-            }
-            _ => {
-                let token = make_token(store);
-                tokens.push(token);
-                break;
+struct Tokenizer<'a> {
+    tokens: Vec<Token>,
+    chars: Peekable<Chars<'a>>,
+    store: String,
+}
+
+impl Tokenizer<'_> {
+    fn new(input: &str) -> Tokenizer {
+        let tokens = Vec::new();
+        let chars = input.chars().peekable();
+        let store = String::new();
+        Tokenizer {
+            chars,
+            tokens,
+            store,
+        }
+    }
+    fn take_while(
+        &mut self,
+        predicate: impl Fn(char) -> bool,
+        make_token: impl FnOnce(String) -> Token,
+    ) {
+        loop {
+            match self.chars.peek() {
+                Some(&next) if predicate(next) => {
+                    self.store.push(next);
+                    self.chars.next();
+                }
+                _ => {
+                    let token = make_token(self.store.clone());
+                    self.tokens.push(token);
+                    self.store.clear();
+                    break;
+                }
             }
         }
     }
 }
 
-fn tokenize(input: impl Into<String>) -> Vec<Token> {
-    let input: String = input.into();
+fn tokenize(input: &str) -> Vec<Token> {
+    let mut tokenizer = Tokenizer::new(input);
 
-    let mut chars = input.chars().peekable();
-
-    let mut tokens = Vec::new();
-
-    while let Some(char) = chars.next() {
+    while let Some(char) = tokenizer.chars.next() {
         if char.is_lowercase() && char.is_alphabetic() {
-            let mut store = String::new();
-            store.push(char);
+            tokenizer.store.push(char);
 
-            take_while(
-                store,
-                &mut tokens,
-                &mut chars,
-                char::is_alphanumeric,
-                Token::LowerIdentifier,
-            );
+            tokenizer.take_while(char::is_alphanumeric, Token::LowerIdentifier)
         } else if char.is_digit(10) && char != '0' {
-            let mut store = String::new();
-            store.push(char);
+            tokenizer.store.push(char);
 
-            take_while(
-                store,
-                &mut tokens,
-                &mut chars,
-                |c| c.is_digit(10),
-                Token::IntegerLiteral,
-            );
+            tokenizer.take_while(|c| c.is_digit(10), Token::IntegerLiteral)
         } else if char == '0' {
-            let second = chars.peek();
+            let second = tokenizer.chars.peek();
             match second {
                 Some(&radix) if radix == 'x' => {
-                    let mut store = String::new();
-                    store.push(char);
-                    store.push(radix);
-                    chars.next();
+                    tokenizer.store.push(char);
+                    tokenizer.store.push(radix);
+                    tokenizer.chars.next();
 
-                    take_while(
-                        store,
-                        &mut tokens,
-                        &mut chars,
-                        |c| c.is_digit(16),
-                        Token::HexIntegerLiteral,
-                    );
+                    tokenizer.take_while(|c| c.is_digit(16), Token::HexIntegerLiteral);
                 }
                 Some(&second) => panic!("invalid radix: {}", second),
                 None => panic!("unexpected EOF"),
@@ -86,9 +79,9 @@ fn tokenize(input: impl Into<String>) -> Vec<Token> {
         }
     }
 
-    tokens.push(Token::EOF);
+    tokenizer.tokens.push(Token::EOF);
 
-    tokens
+    tokenizer.tokens
 }
 
 #[cfg(test)]
