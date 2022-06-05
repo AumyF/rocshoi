@@ -5,10 +5,15 @@ use std::str::Chars;
 pub enum Token {
     IntegerLiteral(String),
     HexIntegerLiteral(String),
+    StringLiteral(String),
     Operator(String),
     LowerIdentifier(String),
     UpperIdentifier(String),
     Keyword(String),
+    ParenLeft,
+    ParenRight,
+    BraceLeft,
+    BraceRight,
     EOF,
 }
 
@@ -76,6 +81,33 @@ fn tokenize(input: &str) -> Vec<Token> {
                 Some(&second) => panic!("invalid radix: {}", second),
                 None => panic!("unexpected EOF"),
             }
+        } else if char == '"' {
+            loop {
+                match tokenizer.chars.peek() {
+                    Some(&next) if next != '"' => {
+                        tokenizer.store.push(next);
+                        tokenizer.chars.next();
+                    }
+                    Some(_) => {
+                        let token = Token::StringLiteral(tokenizer.store.clone());
+                        tokenizer.tokens.push(token);
+                        tokenizer.store.clear();
+                        tokenizer.chars.next(); // throw '"' away
+
+                        break;
+                    }
+                    None => panic!("Unexpected EOF"),
+                }
+            }
+            tokenizer.store.clear();
+        } else if char == '(' {
+            tokenizer.tokens.push(Token::ParenLeft);
+        } else if char == ')' {
+            tokenizer.tokens.push(Token::ParenRight);
+        } else if char == '{' {
+            tokenizer.tokens.push(Token::BraceLeft);
+        } else if char == '}' {
+            tokenizer.tokens.push(Token::BraceRight);
         }
     }
 
@@ -125,6 +157,15 @@ mod tests {
                 HexIntegerLiteral("0xe38182".to_string()),
                 EOF,
             ]
+        )
+    }
+
+    #[test]
+    fn string() {
+        let tokens = tokenize(r#""Hello, world""#);
+        assert_eq!(
+            tokens,
+            vec![StringLiteral("Hello, world".to_string()), EOF,]
         )
     }
 }
