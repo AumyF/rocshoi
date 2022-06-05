@@ -19,14 +19,13 @@ fn tokenize(input: impl Into<String>) -> Vec<Token> {
     while let Some(char) = chars.next() {
         if char.is_lowercase() && char.is_alphabetic() {
             let mut store = String::new();
-            let mut char = char;
-            loop {
-                store.push(char);
+            store.push(char);
 
+            loop {
                 // TODO rewrite using chars.peek().is_some_and()
                 match chars.peek() {
                     Some(&next) if next.is_alphanumeric() => {
-                        char = next;
+                        store.push(next);
                         chars.next();
                     }
                     _ => {
@@ -38,14 +37,12 @@ fn tokenize(input: impl Into<String>) -> Vec<Token> {
             }
         } else if char.is_digit(10) && char != '0' {
             let mut store = String::new();
-            let mut char = char;
+            store.push(char);
 
             loop {
-                store.push(char);
-
                 match chars.peek() {
                     Some(&next) if next.is_digit(10) => {
-                        char = next;
+                        store.push(next);
                         chars.next();
                     }
                     _ => {
