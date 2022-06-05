@@ -1,15 +1,13 @@
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
     IntegerLiteral(String),
+    HexIntegerLiteral(String),
     Operator(String),
     LowerIdentifier(String),
     UpperIdentifier(String),
     Keyword(String),
     EOF,
 }
-
-const DIGITS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const NON_ZERO_DIGITS: [char; 9] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 fn tokenize(input: impl Into<String>) -> Vec<Token> {
     let input: String = input.into();
@@ -38,6 +36,51 @@ fn tokenize(input: impl Into<String>) -> Vec<Token> {
                     }
                 }
             }
+        } else if char.is_digit(10) && char != '0' {
+            let mut store = String::new();
+            let mut char = char;
+
+            loop {
+                store.push(char);
+
+                match chars.peek() {
+                    Some(&next) if next.is_digit(10) => {
+                        char = next;
+                        chars.next();
+                    }
+                    _ => {
+                        let token = Token::IntegerLiteral(store);
+                        tokens.push(token);
+                        break;
+                    }
+                }
+            }
+        } else if char == '0' {
+            let second = chars.peek();
+            match second {
+                Some(&radix) if radix == 'x' => {
+                    let mut store = String::new();
+                    store.push(char);
+                    store.push(radix);
+                    chars.next();
+
+                    loop {
+                        match chars.peek() {
+                            Some(&next) if next.is_digit(16) => {
+                                store.push(next);
+                                chars.next();
+                            }
+                            _ => {
+                                let token = Token::HexIntegerLiteral(store);
+                                tokens.push(token);
+                                break;
+                            }
+                        }
+                    }
+                }
+                Some(&second) => panic!("invalid radix: {}", second),
+                None => panic!("unexpected EOF"),
+            }
         }
     }
 
@@ -49,19 +92,44 @@ fn tokenize(input: impl Into<String>) -> Vec<Token> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use Token::*;
 
     #[test]
     fn def_main() {
-        use Token::*;
-
         let tokens = tokenize(r#"def main"#);
         assert_eq!(
             tokens,
             vec![
-                Token::LowerIdentifier("def".to_string()),
-                Token::LowerIdentifier("main".to_string()),
+                LowerIdentifier("def".to_string()),
+                LowerIdentifier("main".to_string()),
                 Token::EOF,
             ]
         )
+    }
+
+    #[test]
+    fn integer() {
+        let tokens = tokenize(r#"123 321"#);
+        assert_eq!(
+            tokens,
+            vec![
+                IntegerLiteral("123".to_string()),
+                IntegerLiteral("321".to_string()),
+                EOF,
+            ]
+        )
+    }
+    
+    #[test]
+    fn hex_integer() {
+        let tokens = tokenize(r#"0x123 0xe38182"#);
+        assert_eq!(
+            tokens,
+            vec![
+                HexIntegerLiteral("0x123".to_string()),
+                HexIntegerLiteral("0xe38182".to_string()),
+                EOF,
+            ]
+            )
     }
 }
