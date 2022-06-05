@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
     IntegerLiteral(String),
@@ -7,6 +9,28 @@ pub enum Token {
     UpperIdentifier(String),
     Keyword(String),
     EOF,
+}
+
+fn take_while(
+    mut store: String,
+    tokens: &mut Vec<Token>,
+    chars: &mut Peekable<impl Iterator<Item = char>>,
+    predicate: impl Fn(char) -> bool,
+    make_token: impl FnOnce(String) -> Token,
+) {
+    loop {
+        match chars.peek() {
+            Some(&next) if predicate(next) => {
+                store.push(next);
+                chars.next();
+            }
+            _ => {
+                let token = make_token(store);
+                tokens.push(token);
+                break;
+            }
+        }
+    }
 }
 
 fn tokenize(input: impl Into<String>) -> Vec<Token> {
@@ -21,37 +45,24 @@ fn tokenize(input: impl Into<String>) -> Vec<Token> {
             let mut store = String::new();
             store.push(char);
 
-            loop {
-                // TODO rewrite using chars.peek().is_some_and()
-                match chars.peek() {
-                    Some(&next) if next.is_alphanumeric() => {
-                        store.push(next);
-                        chars.next();
-                    }
-                    _ => {
-                        let token = Token::LowerIdentifier(store);
-                        tokens.push(token);
-                        break;
-                    }
-                }
-            }
+            take_while(
+                store,
+                &mut tokens,
+                &mut chars,
+                char::is_alphanumeric,
+                Token::LowerIdentifier,
+            );
         } else if char.is_digit(10) && char != '0' {
             let mut store = String::new();
             store.push(char);
 
-            loop {
-                match chars.peek() {
-                    Some(&next) if next.is_digit(10) => {
-                        store.push(next);
-                        chars.next();
-                    }
-                    _ => {
-                        let token = Token::IntegerLiteral(store);
-                        tokens.push(token);
-                        break;
-                    }
-                }
-            }
+            take_while(
+                store,
+                &mut tokens,
+                &mut chars,
+                |c| c.is_digit(10),
+                Token::IntegerLiteral,
+            );
         } else if char == '0' {
             let second = chars.peek();
             match second {
@@ -61,19 +72,13 @@ fn tokenize(input: impl Into<String>) -> Vec<Token> {
                     store.push(radix);
                     chars.next();
 
-                    loop {
-                        match chars.peek() {
-                            Some(&next) if next.is_digit(16) => {
-                                store.push(next);
-                                chars.next();
-                            }
-                            _ => {
-                                let token = Token::HexIntegerLiteral(store);
-                                tokens.push(token);
-                                break;
-                            }
-                        }
-                    }
+                    take_while(
+                        store,
+                        &mut tokens,
+                        &mut chars,
+                        |c| c.is_digit(16),
+                        Token::HexIntegerLiteral,
+                    );
                 }
                 Some(&second) => panic!("invalid radix: {}", second),
                 None => panic!("unexpected EOF"),
@@ -116,7 +121,7 @@ mod tests {
             ]
         )
     }
-    
+
     #[test]
     fn hex_integer() {
         let tokens = tokenize(r#"0x123 0xe38182"#);
@@ -127,6 +132,6 @@ mod tests {
                 HexIntegerLiteral("0xe38182".to_string()),
                 EOF,
             ]
-            )
+        )
     }
 }
