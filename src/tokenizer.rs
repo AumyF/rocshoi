@@ -1,42 +1,30 @@
+use super::token::Token;
 use std::iter::Peekable;
 use std::str::Chars;
-use super::token::Token;
-
 
 struct Tokenizer<'a> {
     tokens: Vec<Token>,
     chars: Peekable<Chars<'a>>,
-    store: String,
 }
 
 impl Tokenizer<'_> {
     fn new(input: &str) -> Tokenizer {
         let tokens = Vec::new();
         let chars = input.chars().peekable();
-        let store = String::new();
         Tokenizer {
             chars,
             tokens,
-            store,
         }
     }
-    fn take_while(
-        &mut self,
-        predicate: impl Fn(char) -> bool,
-        make_token: impl FnOnce(String) -> Token,
-    ) {
+
+    fn take_while(&mut self, store: &mut String, predicate: impl Fn(char) -> bool) {
         loop {
             match self.chars.peek() {
                 Some(&next) if predicate(next) => {
-                    self.store.push(next);
+                    store.push(next);
                     self.chars.next();
                 }
-                _ => {
-                    let token = make_token(self.store.clone());
-                    self.tokens.push(token);
-                    self.store.clear();
-                    break;
-                }
+                _ => break,
             }
         }
     }
@@ -47,37 +35,47 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 
     while let Some(char) = tokenizer.chars.next() {
         if char.is_lowercase() && char.is_alphabetic() {
-            tokenizer.store.push(char);
+            let mut store = String::new();
+            store.push(char);
 
-            tokenizer.take_while(char::is_alphanumeric, Token::LowerIdentifier)
+            tokenizer.take_while(&mut store, char::is_alphanumeric);
+            let token = Token::LowerIdentifier(store);
+            tokenizer.tokens.push(token);
         } else if char.is_digit(10) && char != '0' {
-            tokenizer.store.push(char);
+            let mut store = String::new();
+            store.push(char);
 
-            tokenizer.take_while(|c| c.is_digit(10), Token::IntegerLiteral)
+            tokenizer.take_while(&mut store, |c| c.is_digit(10));
+            let token = Token::IntegerLiteral(store);
+            tokenizer.tokens.push(token);
         } else if char == '0' {
             let second = tokenizer.chars.peek();
             match second {
                 Some(&radix) if radix == 'x' => {
-                    tokenizer.store.push(char);
-                    tokenizer.store.push(radix);
+                    let mut store = String::new();
+                    store.push(char);
+                    store.push(radix);
                     tokenizer.chars.next();
 
-                    tokenizer.take_while(|c| c.is_digit(16), Token::HexIntegerLiteral);
+                    tokenizer.take_while(&mut store, |c| c.is_digit(16));
+                    let token = Token::HexIntegerLiteral(store);
+                    tokenizer.tokens.push(token);
                 }
                 Some(&second) => panic!("invalid radix: {}", second),
                 None => panic!("unexpected EOF"),
             }
         } else if char == '"' {
+            let mut store = String::new();
             loop {
                 match tokenizer.chars.peek() {
                     Some(&next) if next != '"' => {
-                        tokenizer.store.push(next);
+                        store.push(next);
                         tokenizer.chars.next();
                     }
                     Some(_) => {
-                        let token = Token::StringLiteral(tokenizer.store.clone());
+                        let token = Token::StringLiteral(store);
                         tokenizer.tokens.push(token);
-                        tokenizer.store.clear();
+
                         tokenizer.chars.next(); // throw '"' away
 
                         break;
@@ -85,7 +83,6 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                     None => panic!("Unexpected EOF"),
                 }
             }
-            tokenizer.store.clear();
         } else if char == '(' {
             tokenizer.tokens.push(Token::ParenLeft);
         } else if char == ')' {
