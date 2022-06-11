@@ -2,13 +2,14 @@ use super::token::Token;
 use std::iter::Peekable;
 use std::str::Chars;
 
-struct Tokenizer<'a> {
+#[derive(Debug, Clone)]
+pub struct Tokenizer<'a> {
     chars: Peekable<Chars<'a>>,
     sentEOF: bool,
 }
 
 impl Tokenizer<'_> {
-    fn new(input: &str) -> Tokenizer {
+    pub fn new(input: &str) -> Tokenizer {
         let chars = input.chars().peekable();
         Tokenizer {
             chars,
