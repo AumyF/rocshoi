@@ -52,9 +52,10 @@ impl Iterator for Tokenizer<'_> {
 
                 self.take_while(&mut store, char::is_alphanumeric);
 
-                let token =  match &store[..] {
-                   "def" => Token::Def,
-                   _ => Token::LowerIdentifier(store)};
+                let token = match &store[..] {
+                    "def" => Token::Def,
+                    _ => Token::LowerIdentifier(store),
+                };
                 Some(token)
             } else if char.is_digit(10) && char != '0' {
                 let mut store = String::new();
