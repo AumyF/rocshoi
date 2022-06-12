@@ -51,7 +51,10 @@ impl Iterator for Tokenizer<'_> {
                 store.push(char);
 
                 self.take_while(&mut store, char::is_alphanumeric);
-                let token = Token::LowerIdentifier(store);
+
+                let token =  match &store[..] {
+                   "def" => Token::Def,
+                   _ => Token::LowerIdentifier(store)};
                 Some(token)
             } else if char.is_digit(10) && char != '0' {
                 let mut store = String::new();
@@ -126,12 +129,17 @@ mod tests {
 
     #[test]
     fn def_main() {
-        let tokens: Vec<Token> = Tokenizer::new(r#"def main"#).collect();
+        let tokens: Vec<Token> = Tokenizer::new(r#"def main(arg) {}"#).collect();
         assert_eq!(
             tokens,
             vec![
-                LowerIdentifier("def".to_string()),
+                Def,
                 LowerIdentifier("main".to_string()),
+                ParenLeft,
+                LowerIdentifier("arg".to_string()),
+                ParenRight,
+                BraceLeft,
+                BraceRight,
                 EOF,
             ]
         )
